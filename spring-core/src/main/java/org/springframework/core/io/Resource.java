@@ -29,10 +29,12 @@ import org.springframework.lang.Nullable;
 /**
  * Interface for a resource descriptor that abstracts from the actual
  * type of underlying resource, such as a file or class path resource.
+ * 资源描述符的接口，该描述符从基础资源(如文件或类路径资源)的实际类型中抽象出来。
  *
  * <p>An InputStream can be opened for every resource if it exists in
  * physical form, but a URL or File handle can just be returned for
  * certain resources. The actual behavior is implementation-specific.
+ * 如果以物理形式存在，InputStream可以为每个资源打开，但URL或文件句柄只能为某些资源返回。实际行为是特定于实现的。
  *
  * @author Juergen Hoeller
  * @since 28.12.2003

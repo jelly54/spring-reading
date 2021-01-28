@@ -295,6 +295,8 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 
 	/**
 	 * Load bean definitions from the specified XML file.
+	 * 从特定的XML文件加载 bean 的定义
+	 *
 	 * @param resource the resource descriptor for the XML file
 	 * @return the number of bean definitions found
 	 * @throws BeanDefinitionStoreException in case of loading or parsing errors
@@ -306,6 +308,8 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 
 	/**
 	 * Load bean definitions from the specified XML file.
+	 * 从特定XML文件中加载 bean 定义
+	 *
 	 * @param encodedResource the resource descriptor for the XML file,
 	 * allowing to specify an encoding to use for parsing the file
 	 * @return the number of bean definitions found
@@ -378,6 +382,8 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 
 	/**
 	 * Actually load bean definitions from the specified XML file.
+	 * 实际上从特定XML文件中加载bean 定义
+	 *
 	 * @param inputSource the SAX InputSource to read from
 	 * @param resource the resource descriptor for the XML file
 	 * @return the number of bean definitions found
@@ -436,6 +442,11 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 * mode gets {@link #detectValidationMode detected} from the given resource.
 	 * <p>Override this method if you would like full control over the validation
 	 * mode, even when something other than {@link #VALIDATION_AUTO} was set.
+	 * 确定指定的{@link Resource}的验证模式。
+	 * 如果没有配置显式的验证模式，那么验证模式将从给定的资源中获取{@link #detectValidationMode detected}。
+	 * 如果你想要完全控制验证模式，可以重写这个方法，即使设置了{@link #VALIDATION_AUTO}以外的内容。
+	 * 如果从给定的资源中获取到的mode为VALIDATION_AUTO，则使用 xsd 模式
+	 *
 	 * @see #detectValidationMode
 	 */
 	protected int getValidationModeForResource(Resource resource) {
@@ -458,6 +469,9 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 * by the supplied {@link Resource}. If the file has a {@code DOCTYPE}
 	 * definition then DTD validation is used otherwise XSD validation is assumed.
 	 * <p>Override this method if you would like to customize resolution
+	 * 检测要对由提供的{@link Resource}标识的XML文件执行哪种验证。
+	 * 如果文件具有{@code DOCTYPE}定义，则使用DTD验证，否则假定为XSD验证。如果您想自定义分辨率，请重写此方法
+	 *
 	 * of the {@link #VALIDATION_AUTO} mode.
 	 */
 	protected int detectValidationMode(Resource resource) {
@@ -504,8 +518,11 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 */
 	public int registerBeanDefinitions(Document doc, Resource resource) throws BeanDefinitionStoreException {
 		BeanDefinitionDocumentReader documentReader = createBeanDefinitionDocumentReader();
+		// 记录统计前 BeanDefinition 的加载个数
 		int countBefore = getRegistry().getBeanDefinitionCount();
+		// 加载及注册bean
 		documentReader.registerBeanDefinitions(doc, createReaderContext(resource));
+		// 记录本次加载的 BeanDefinition 的加载个数
 		return getRegistry().getBeanDefinitionCount() - countBefore;
 	}
 
