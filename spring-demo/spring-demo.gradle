@@ -1,0 +1,7 @@
+description = "Spring Demo"
+
+
+dependencies {
+    compile(project(":spring-context"))
+    testImplementation 'junit:junit:4.12'
+}
