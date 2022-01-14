@@ -142,7 +142,7 @@ public class BeanDefinitionReaderUtils {
 
 	/**
 	 * Register the given bean definition with the given bean factory.
-	 * 将给定的bean定义注册到 给定的bean工厂。
+	 * 将给定的bean定义注册到 给定的bean工厂。 处理bean的注解预处理工作
 	 *
 	 * @param definitionHolder the bean definition including name and aliases
 	 * @param registry the bean factory to register with
@@ -153,9 +153,16 @@ public class BeanDefinitionReaderUtils {
 			throws BeanDefinitionStoreException {
 
 		// Register bean definition under primary name.
-		// 在主名称下注册bean定义。
-		// 使用 beanName 做唯一标识注册
+		// 在主名称下注册bean定义。 使用 beanName 做唯一标识注册
+		/*
+		 * 这里就是将Holder拆解为beanName和beanDefinition，并正式注册
+		 */
 		String beanName = definitionHolder.getBeanName();
+		/*
+		 * 调用的是 AnnotationConfigApplicationContext 的父类 GenericApplicationContext的registerBeanDefinition()
+		 * 方法，这是个空调用，调用了下面的方法
+		 * @see DefaultListableBeanFactory#registerBeanDefinition(java.lang.String, org.springframework.beans.factory.config.BeanDefinition)
+		 */
 		registry.registerBeanDefinition(beanName, definitionHolder.getBeanDefinition());
 
 		// Register aliases for bean name, if any.

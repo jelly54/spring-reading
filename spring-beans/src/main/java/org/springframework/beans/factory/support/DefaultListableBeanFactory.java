@@ -154,6 +154,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	private final Map<Class<?>, Object> resolvableDependencies = new ConcurrentHashMap<>(16);
 
 	/** Map of bean definition objects, keyed by bean name */
+	/** 存放BeanDefinition和BeanName的集合 */
 	private final Map<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>(256);
 
 	/** Map of singleton and non-singleton bean names, keyed by dependency type */
@@ -163,9 +164,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	private final Map<Class<?>, String[]> singletonBeanNamesByType = new ConcurrentHashMap<>(64);
 
 	/** List of bean definition names, in registration order */
+	/** 存放已经注册的BeanDefinition的BeanName集合 */
 	private volatile List<String> beanDefinitionNames = new ArrayList<>(256);
 
 	/** List of names of manually registered singletons, in registration order */
+	/** 存放手动注册的单例实例Bean的BeanName集合 */
 	private volatile Set<String> manualSingletonNames = new LinkedHashSet<>(16);
 
 	/** Cached array of bean definition names in case of frozen configuration */
@@ -782,6 +785,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	// Implementation of BeanDefinitionRegistry interface
 	//---------------------------------------------------------------------
 
+	/**
+	 * 向此类注册BeanDefinition的实质性方法
+	 * 其最终的目的是向beanDefinitionMap属性这个Map中put BeanName键对应的BeanDefinition
+	 * 这个Map中存放了spring容器中所有的BeanDefinition
+	 */
 	@Override
 	public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition)
 			throws BeanDefinitionStoreException {
@@ -801,8 +809,14 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
 		}
 
+		/*
+		 * 通过beanName在 beanDefinitionMap 中获取BeanDefinition
+		 */
 		BeanDefinition existingDefinition = this.beanDefinitionMap.get(beanName);
-		// 处理注册已经注册的 beanName 情况
+		/*
+		 * 处理注册已经注册的 beanName 情况
+		 * 如果已经存在对应的 BeanDefinition ,判断是否覆盖，不覆盖的话就抛异常
+		 */
 		if (existingDefinition != null) {
 			// 如果对应的 BeanName 已经注册且在配置中配置了 bean 不允许被覆盖，则抛出异常，默认允许
 			if (!isAllowBeanDefinitionOverriding()) {
@@ -832,6 +846,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 							"] with [" + beanDefinition + "]");
 				}
 			}
+			/*
+			 * 向 DefaultListableBeanFactory 中的 beanDefinitionMap 注册类
+			 */
 			this.beanDefinitionMap.put(beanName, beanDefinition);
 		}
 		else {
@@ -853,9 +870,19 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
 			else {
 				// Still in startup registration phase
-				// 仍处于启动注册阶段
+				/*
+				 * 在此类 DefaultListableBeanFactory 中维护了一个Map，此Map相当重要，此Map中存储了应用的类
+				 * 此Map变量就是 beanDefinitionMap，向此Map中put就是将类注册进 BeanFactory 中了
+				 * 但是代码运行到这，发现Map中已经存在6个类了，这6个类很重要
+				 */
 				this.beanDefinitionMap.put(beanName, beanDefinition);
+				/*
+				 * 将beanName添加到 beanDefinitionNames 这个list集合中
+				 */
 				this.beanDefinitionNames.add(beanName);
+				/*
+				 * 将beanName从 manualSingletonNames 这个set集合中删除，这个集合存放着手动注册的单例实例的BeanName
+				 */
 				this.manualSingletonNames.remove(beanName);
 			}
 			this.frozenBeanDefinitionNames = null;

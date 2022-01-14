@@ -257,6 +257,10 @@ public class AnnotationConfigUtils {
 		processCommonDefinitionAnnotations(abd, abd.getMetadata());
 	}
 
+	/*
+	 * 通过类的元数据信息提取类中是否有Lazy、Primary、DependsOn等注解
+	 * 有的话就将这些信息设置进 AnnotatedBeanDefinition中 (即类对应的BeanDefinition中)
+	 */
 	static void processCommonDefinitionAnnotations(AnnotatedBeanDefinition abd, AnnotatedTypeMetadata metadata) {
 		AnnotationAttributes lazy = attributesFor(metadata, Lazy.class);
 		if (lazy != null) {

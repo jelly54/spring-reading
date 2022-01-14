@@ -210,6 +210,8 @@ public class AnnotatedBeanDefinitionReader {
 	}
 
 	/**
+	 * 对class进行解析并注册BeanDefinition
+	 *
 	 * Register a bean from the given bean class, deriving its metadata from
 	 * class-declared annotations.
 	 * @param annotatedClass the class of the bean
@@ -225,16 +227,40 @@ public class AnnotatedBeanDefinitionReader {
 	<T> void doRegisterBean(Class<T> annotatedClass, @Nullable Supplier<T> instanceSupplier, @Nullable String name,
 			@Nullable Class<? extends Annotation>[] qualifiers, BeanDefinitionCustomizer... definitionCustomizers) {
 
+		/*
+		 * 根据指定的bean通过构造方法创建一个 AnnotatedGenericBeanDefinition
+		 * AnnotatedGenericBeanDefinition 可以理解为一个数据结构，包含了类的元信息等其它信息
+		 * 同时这个类也间接实现了 BeanDefinition 接口，具备了此接口的功能
+		 */
 		AnnotatedGenericBeanDefinition abd = new AnnotatedGenericBeanDefinition(annotatedClass);
+		/*
+		 * 判断这个类是否跳过解析(是否加载进 SpringContext 中)
+		 * abd.getMetadata() 永远不会等于null，重点在 Conditional 注解的存在
+		 */
 		if (this.conditionEvaluator.shouldSkip(abd.getMetadata())) {
 			return;
 		}
 
+		/*
+		 * JDK8新特性，支持函数式创建对象，Supplier接口中只有一个get()方法
+		 *  比如：Supplier<User> sup= User::new；//此时并不会调用对象的构造方法，即不会创建对象
+		 *  sup.get() //此时会调用对象的构造方法，即获得到真正对象,且每次都会调用构造方法，即每次获得的对象不同
+		 */
 		abd.setInstanceSupplier(instanceSupplier);
+		/*
+		 * 得到类的作用域设置进AnnotatedGenericBeanDefinition中
+		 */
 		ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(abd);
 		abd.setScope(scopeMetadata.getScopeName());
+		/*
+		 * 生成类的名字，通过 beanNameGenerator，因为类可以有别名
+		 */
 		String beanName = (name != null ? name : this.beanNameGenerator.generateBeanName(abd, this.registry));
 
+		/*
+		 * 处理类中的通用注解：Lazy、Primary、DependsOn等等
+		 * 依然是将这些信息添加进 AnnotatedGenericBeanDefinition 数据结构中
+		 */
 		AnnotationConfigUtils.processCommonDefinitionAnnotations(abd);
 		if (qualifiers != null) {
 			for (Class<? extends Annotation> qualifier : qualifiers) {
@@ -253,8 +279,23 @@ public class AnnotatedBeanDefinitionReader {
 			customizer.customize(abd);
 		}
 
+		/*
+		 * 这是一个数据结构，用于封装bean的名称和对应的 BeanDefinition
+		 * 这样的好处就是方便传参，同时在数据结构内部可对外提供对数据的解析方法，拥有很好的封装性
+		 */
 		BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(abd, beanName);
+		/*
+		 * ScopeProxyMode 代理的处理，如果此类需要ProxyMode代理，则创建一个代理对应的 BeanDefinitionHolder
+		 * SpringMVC 中会用到，这里暂不讲述
+		 */
 		definitionHolder = AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
+		/*
+		 * 把数据结构注册进 this.registry 中，this.registry 就是 AnnotationConfigApplicationContext
+		 * AnnotationConfigApplicationContext 的空参构造方法中通过此类的 AnnotatedBeanDefinitionReader(BeanDefinitionRegistry registry)
+		 * 构造方法将 AnnotationConfigApplicationContext 赋值给 this.registry
+		 * AnnotationConfigApplicationContext 在实例化的时候通过调用父类的构造方法实例化了一个 DefaultListableBeanFactory
+		 * 这里就是将Holder中携带的信息注册到 DefaultListableBeanFactory 工厂
+		 */
 		BeanDefinitionReaderUtils.registerBeanDefinition(definitionHolder, this.registry);
 	}
 
