@@ -134,6 +134,8 @@ public class AnnotatedBeanDefinitionReader {
 
 
 	/**
+	 * 由于这里可以传进来多个，所以遍历依次进行注册
+	 *
 	 * Register one or more annotated classes to be processed.
 	 * <p>Calls to {@code register} are idempotent; adding the same
 	 * annotated class more than once has no additional effect.

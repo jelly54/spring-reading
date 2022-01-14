@@ -165,6 +165,9 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	//---------------------------------------------------------------------
 
 	/**
+	 * 向容器中注册bean，可以注册两种bean：一个是配置bean，一个是单个bean(无配置)
+	 * 这里用到了默认构造方法构建好的 this.reader 参数实例对象中的方法
+	 *
 	 * Register one or more annotated classes to be processed.
 	 * <p>Note that {@link #refresh()} must be called in order for the context
 	 * to fully process the new classes.
@@ -176,6 +179,9 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	 */
 	public void register(Class<?>... annotatedClasses) {
 		Assert.notEmpty(annotatedClasses, "At least one annotated class must be specified");
+		/*
+		 * 使用类读取器对其进行解析注册
+		 */
 		this.reader.register(annotatedClasses);
 	}
 
