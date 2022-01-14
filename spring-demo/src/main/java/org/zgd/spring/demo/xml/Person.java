@@ -1,4 +1,4 @@
-package org.zgd.spring.demo;
+package org.zgd.spring.demo.xml;
 
 /**
  * @author zhangguodong

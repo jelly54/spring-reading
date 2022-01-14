@@ -1,4 +1,4 @@
-package org.zgd.spring.demo;
+package org.zgd.spring.demo.xml;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
