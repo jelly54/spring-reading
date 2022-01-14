@@ -135,6 +135,10 @@ public class AnnotationConfigUtils {
 	}
 
 	/**
+	 * 该方法主要向容器注册了几个重要的类，这些类可以使 spring容器 具备识别解析容器中 BeanDefinition 的能力
+	 * 其中最终要的是注册了 ConfigurationClassPostProcessor 这个类，这个类实现了 BeanDefinitionRegistryPostProcessor 接口，
+	 * 间接实现了 BeanFactoryPostProcessor 接口，此类比较重要，详情看类注释
+	 *
 	 * Register all relevant annotation post processors in the given registry.
 	 * @param registry the registry to operate on
 	 * @param source the configuration source element (already extracted)
@@ -145,11 +149,20 @@ public class AnnotationConfigUtils {
 	public static Set<BeanDefinitionHolder> registerAnnotationConfigProcessors(
 			BeanDefinitionRegistry registry, @Nullable Object source) {
 
+		/*
+		 * 通过这个方法能够获取 DefaultListableBeanFactory
+		 */
 		DefaultListableBeanFactory beanFactory = unwrapDefaultListableBeanFactory(registry);
 		if (beanFactory != null) {
+			/*
+			 * 实例化依赖关系比较器，能解析 @Order 和 @Priority
+			 */
 			if (!(beanFactory.getDependencyComparator() instanceof AnnotationAwareOrderComparator)) {
 				beanFactory.setDependencyComparator(AnnotationAwareOrderComparator.INSTANCE);
 			}
+			/*
+			 * 实例化 autowire 候选解析器,处理延迟加载
+			 */
 			if (!(beanFactory.getAutowireCandidateResolver() instanceof ContextAnnotationAutowireCandidateResolver)) {
 				beanFactory.setAutowireCandidateResolver(new ContextAnnotationAutowireCandidateResolver());
 			}
@@ -157,6 +170,10 @@ public class AnnotationConfigUtils {
 
 		Set<BeanDefinitionHolder> beanDefs = new LinkedHashSet<>(8);
 
+		/*
+		 * 以下是向容器中注册6个后置处理器(每个处理器都有指定的BeanName,BeanName和类名称有可能不一致)
+		 * 其中 ConfigurationClassPostProcessor 是BeanFactory级别的后置处理器，其它是Bean级别的后置处理器
+		 */
 		if (!registry.containsBeanDefinition(CONFIGURATION_ANNOTATION_PROCESSOR_BEAN_NAME)) {
 			RootBeanDefinition def = new RootBeanDefinition(ConfigurationClassPostProcessor.class);
 			def.setSource(source);
@@ -203,6 +220,9 @@ public class AnnotationConfigUtils {
 			beanDefs.add(registerPostProcessor(registry, def, EVENT_LISTENER_PROCESSOR_BEAN_NAME));
 		}
 
+		/*
+		 * 向容器中注册默认的监听事件工厂
+		 */
 		if (!registry.containsBeanDefinition(EVENT_LISTENER_FACTORY_BEAN_NAME)) {
 			RootBeanDefinition def = new RootBeanDefinition(DefaultEventListenerFactory.class);
 			def.setSource(source);

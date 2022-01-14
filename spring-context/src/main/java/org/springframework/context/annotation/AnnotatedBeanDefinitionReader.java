@@ -67,11 +67,18 @@ public class AnnotatedBeanDefinitionReader {
 	 * @see #setEnvironment(Environment)
 	 */
 	public AnnotatedBeanDefinitionReader(BeanDefinitionRegistry registry) {
+		/*
+		 * 获取Spring的环境，进行下一步构造函数调用
+		 */
 		this(registry, getOrCreateEnvironment(registry));
 	}
 
 	/**
-	 * Create a new {@code AnnotatedBeanDefinitionReader} for the given registry and using
+	 * BeanDefinitionRegistry 是通过 AnnotationConfigApplicationContext 类的构造方法中通过this传过来的
+	 * 说明 AnnotationConfigApplicationContext 是实现了 BeanDefinitionRegistry 接口的类
+	 * BeanDefinitionRegistry 通过名字就能看出他是 BeanDefinition 的注册器
+	 *
+	 *  Create a new {@code AnnotatedBeanDefinitionReader} for the given registry and using
 	 * the given {@link Environment}.
 	 * @param registry the {@code BeanFactory} to load bean definitions into,
 	 * in the form of a {@code BeanDefinitionRegistry}
@@ -84,6 +91,9 @@ public class AnnotatedBeanDefinitionReader {
 		Assert.notNull(environment, "Environment must not be null");
 		this.registry = registry;
 		this.conditionEvaluator = new ConditionEvaluator(registry, environment, null);
+		/*
+		 * 这里主要完成了spring的6个类注册
+		 */
 		AnnotationConfigUtils.registerAnnotationConfigProcessors(this.registry);
 	}
 
@@ -248,6 +258,8 @@ public class AnnotatedBeanDefinitionReader {
 
 
 	/**
+	 * 如果注册器实现了 EnvironmentCapable 接口，从注册器中获取环境，否则返回新的标准环境。
+	 *
 	 * Get the Environment from the given registry if possible, otherwise return a new
 	 * StandardEnvironment.
 	 */
