@@ -19,6 +19,16 @@ package org.springframework.beans.factory.config;
 import org.springframework.beans.BeansException;
 
 /**
+ *  * spring扩展点之一，容器级别
+ *  * 实现该接口，可以在spring容器创建Bean实例之前参与所有Bean的定义工作，因为在
+ *  * postProcessBeanFactory()方法中spring已经把ConfigurableListableBeanFactory传进来了
+ *  * 所以可以在spring容易加载了BeanDefinition之后并在Bean实例化之前调用该接口的实现类
+ *  * 从而可以读取BeanDefinition并修改
+ *  * 比如可以将BeanDefinition中的scope从singleton变为prototype等等
+ *  *
+ *  * 同时该接口的实现类也是在一个队列里面，实现类可通过实现
+ *  * PriorityOrdered#getOrder()决定执行顺序，返回数字越小越先执行
+ *
  * Allows for custom modification of an application context's bean definitions,
  * adapting the bean property values of the context's underlying bean factory.
  *

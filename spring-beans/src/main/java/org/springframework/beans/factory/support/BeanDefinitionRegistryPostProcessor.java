@@ -20,6 +20,10 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 
 /**
+ * BeanFactoryPostProcessor接口实现之一，同时这也是Spring的扩展点之一，容器级别
+ * 这个接口会在BeanFactoryPostProcessor接口之前执行，其目的是在之前注册更多的bean定义
+ * BeanDefinition的注册器已经给到，可向容器中添加更多的BeanDefinition
+ *
  * Extension to the standard {@link BeanFactoryPostProcessor} SPI, allowing for
  * the registration of further bean definitions <i>before</i> regular
  * BeanFactoryPostProcessor detection kicks in. In particular,

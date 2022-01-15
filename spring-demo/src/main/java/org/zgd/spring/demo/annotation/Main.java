@@ -12,5 +12,7 @@ public class Main {
 		AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext();
 		// 向spring注册一个类
 		applicationContext.register(TestConfig.class);
+		// 初始化 SpringContext
+		applicationContext.refresh();
 	}
 }
