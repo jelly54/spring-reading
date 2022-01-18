@@ -184,6 +184,8 @@ abstract class ConfigurationClassUtils {
 	}
 
 	/**
+	 * 查看 BeanDefinition 是否被标识为一个全配置类
+	 *
 	 * Determine whether the given bean definition indicates a full {@code @Configuration}
 	 * class, through checking {@link #checkConfigurationClassCandidate}'s metadata marker.
 	 */
@@ -192,6 +194,8 @@ abstract class ConfigurationClassUtils {
 	}
 
 	/**
+	 * 查看 BeanDefinition 是否被标识为一个半配置类
+	 *
 	 * Determine whether the given bean definition indicates a lite {@code @Configuration}
 	 * class, through checking {@link #checkConfigurationClassCandidate}'s metadata marker.
 	 */
