@@ -114,6 +114,8 @@ public class MutablePropertySources implements PropertySources {
 	}
 
 	/**
+	 * 添加新加入的属性源，他的搜索优先级高于相对属性源(相对属性源我的理解是默认属性源)
+	 *
 	 * Add the given property source object with precedence immediately higher
 	 * than the named relative property source.
 	 */
@@ -122,9 +124,13 @@ public class MutablePropertySources implements PropertySources {
 			logger.debug("Adding PropertySource '" + propertySource.getName() +
 					"' with search precedence immediately higher than '" + relativePropertySourceName + "'");
 		}
+		// 判断他两个的属性源名称是否一致，如果一致的话则抛异常
 		assertLegalRelativeAddition(relativePropertySourceName, propertySource);
+		// 从属性源列表中删除这个属性，严谨判断，因为在之前的判断中都是使用的名称比较
 		removeIfPresent(propertySource);
+		// 获得相对属性源的坐标
 		int index = assertPresentAndGetIndex(relativePropertySourceName);
+		// 向指定坐标添加配置，相对属性源将向后移位
 		addAtIndex(index, propertySource);
 	}
 

@@ -397,23 +397,43 @@ class ConfigurationClassParser {
 	}
 
 	/**
+	 * 处理配置类的内部类
 	 * Register member (nested) classes that happen to be configuration classes themselves.
 	 */
 	private void processMemberClasses(ConfigurationClass configClass, SourceClass sourceClass) throws IOException {
+		// 获取配置类的内部类的 SourceClass 实例集合
 		Collection<SourceClass> memberClasses = sourceClass.getMemberClasses();
+		// 如果存在内部类，则对内部类进行解析
 		if (!memberClasses.isEmpty()) {
+			// 构建需要处理的集合
 			List<SourceClass> candidates = new ArrayList<>(memberClasses.size());
+			// 遍历所有的内部类，如果内部类是配置类，即配置了一些配置注解
+			// 并且内部类的列名和宿主类的类名不同时 放入处理集合中
 			for (SourceClass memberClass : memberClasses) {
 				if (ConfigurationClassUtils.isConfigurationCandidate(memberClass.getMetadata()) &&
 						!memberClass.getMetadata().getClassName().equals(configClass.getMetadata().getClassName())) {
 					candidates.add(memberClass);
 				}
 			}
+			// 对需要处理的内部配置类集合进行排序
 			OrderComparator.sort(candidates);
+			// 对内部类进行处理
 			for (SourceClass candidate : candidates) {
+				// 如果import队列里面存在内部类宿主类，则证明宿主类正在等待处理或者正在处理
+				// 这时产生问题报告，此种情况是异常的
 				if (this.importStack.contains(configClass)) {
 					this.problemReporter.error(new CircularImportProblem(configClass, this.importStack));
 				}
+				// 否则的话就加入处理队列中并解析内部配置类，最后在处理队列中弹出处理完成的宿主类
+				// 这里注意宿主类
+				// class A{
+				//     class B {
+				//     		class C {}
+				//     }
+				//  }
+				//  B的宿主类是A，C的宿主类是B
+				// 这里实际上是一个递归调用，因为内部类也可能有内部类(这种情况很少)
+				// pop函数弹出的永远是最后处理内部类的宿主类
 				else {
 					this.importStack.push(configClass);
 					try {
@@ -483,31 +503,42 @@ class ConfigurationClassParser {
 
 
 	/**
+	 * 解析 @PropertySource 注解
+	 *
 	 * Process the given <code>@PropertySource</code> annotation metadata.
 	 * @param propertySource metadata for the <code>@PropertySource</code> annotation found
 	 * @throws IOException if loading a property source failed
 	 */
 	private void processPropertySource(AnnotationAttributes propertySource) throws IOException {
+		// 获得name参数值
 		String name = propertySource.getString("name");
 		if (!StringUtils.hasLength(name)) {
 			name = null;
 		}
+		// 获得 encoding 参数值，编码格式
 		String encoding = propertySource.getString("encoding");
 		if (!StringUtils.hasLength(encoding)) {
 			encoding = null;
 		}
+		// 提取value属性，配置文本，并保证value属性有值，没有值则抛异常
 		String[] locations = propertySource.getStringArray("value");
 		Assert.isTrue(locations.length > 0, "At least one @PropertySource(value) location is required");
+		// 获取 ignoreResourceNotFound 值，是否忽略未找到的资源，默认是 false
 		boolean ignoreResourceNotFound = propertySource.getBoolean("ignoreResourceNotFound");
 
+		// 获取属性源解析工厂，若没有指定则使用默认的
 		Class<? extends PropertySourceFactory> factoryClass = propertySource.getClass("factory");
 		PropertySourceFactory factory = (factoryClass == PropertySourceFactory.class ?
 				DEFAULT_PROPERTY_SOURCE_FACTORY : BeanUtils.instantiateClass(factoryClass));
 
+		// 遍历配置文本
 		for (String location : locations) {
 			try {
+				// 对配置文本中的$占位符做解析，替换成代表的值
 				String resolvedLocation = this.environment.resolveRequiredPlaceholders(location);
+				// 将配置文本指向的配置文件转化为属性源 Resource 对象
 				Resource resource = this.resourceLoader.getResource(resolvedLocation);
+				// 将属性源添加到环境中
 				addPropertySource(factory.createPropertySource(name, new EncodedResource(resource, encoding)));
 			}
 			catch (IllegalArgumentException | FileNotFoundException | UnknownHostException | SocketException ex) {
@@ -524,23 +555,38 @@ class ConfigurationClassParser {
 		}
 	}
 
+	/**
+	 * 将配置添加到容器中
+	 * @param propertySource 配置文件
+	 */
 	private void addPropertySource(PropertySource<?> propertySource) {
+		// 获取配置名
 		String name = propertySource.getName();
+		// 获取容器环境中的配置
 		MutablePropertySources propertySources = ((ConfigurableEnvironment) this.environment).getPropertySources();
 
+		// 在容器环境中是否有同名的配置
 		if (this.propertySourceNames.contains(name)) {
 			// We've already added a version, we need to extend it
+			// 根据名称获取环境中的配置
 			PropertySource<?> existing = propertySources.get(name);
+			// 确定环境中的配置不为空
 			if (existing != null) {
 				PropertySource<?> newSource = (propertySource instanceof ResourcePropertySource ?
 						((ResourcePropertySource) propertySource).withResourceName() : propertySource);
+				// 如果环境中同名称的资源实现了 CompositePropertySource 接口，Spring 则会将新加入的配置作为首选，之前的配置作为备选，
+				// 具体可以查看 addFirstPropertySource() 方法，实际上里面包含了一个List集合，Spring 巧妙的将新的配置放置在0坐标上
 				if (existing instanceof CompositePropertySource) {
 					((CompositePropertySource) existing).addFirstPropertySource(newSource);
 				}
+				// 如果环境之前存在的配置不是复合配置，则转换成复合配置
 				else {
 					if (existing instanceof ResourcePropertySource) {
 						existing = ((ResourcePropertySource) existing).withResourceName();
 					}
+					// 构建一个复合配置对象，实际上里面维护了一个List列表
+					// 然后放入配置，将新的配置放在第一位首选，之前存在于环境中的配置放在后面，作为备选
+					// 并且将环境中的配置替换为复合配置对象
 					CompositePropertySource composite = new CompositePropertySource(name);
 					composite.addPropertySource(newSource);
 					composite.addPropertySource(existing);
@@ -550,11 +596,17 @@ class ConfigurationClassParser {
 			}
 		}
 
+		/*
+		 * 如果环境中的配置名称是空的，则证明还没有配置放置到环境中，这时这个配置是最低优先级的配置
+		 * 因为一旦有同名称新的配置加入的话，这个配置就成为备选配置了
+		 */
 		if (this.propertySourceNames.isEmpty()) {
 			propertySources.addLast(propertySource);
 		}
 		else {
+			// 获取最低优先级的属性源名称
 			String firstProcessed = this.propertySourceNames.get(this.propertySourceNames.size() - 1);
+			// 将新加入的配置放到配置源列表中
 			propertySources.addBefore(firstProcessed, propertySource);
 		}
 		this.propertySourceNames.add(name);

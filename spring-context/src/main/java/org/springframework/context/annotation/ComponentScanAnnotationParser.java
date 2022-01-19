@@ -72,16 +72,22 @@ class ComponentScanAnnotationParser {
 		this.registry = registry;
 	}
 
-
+	/**
+	 * 对 ComponentScan 中描述的包中的类进行扫描解析成 BeanDefinition
+	 * 本方法主要是对扫描器设置必要的配置，具体的扫描解析调用的是扫描器中的方法
+	 */
 	public Set<BeanDefinitionHolder> parse(AnnotationAttributes componentScan, final String declaringClass) {
+		// 定义一个扫描器
 		ClassPathBeanDefinitionScanner scanner = new ClassPathBeanDefinitionScanner(this.registry,
 				componentScan.getBoolean("useDefaultFilters"), this.environment, this.resourceLoader);
 
+		// 获取 @ComponentScan 注解中设置的 BeanName 生成器
 		Class<? extends BeanNameGenerator> generatorClass = componentScan.getClass("nameGenerator");
 		boolean useInheritedGenerator = (BeanNameGenerator.class == generatorClass);
 		scanner.setBeanNameGenerator(useInheritedGenerator ? this.beanNameGenerator :
 				BeanUtils.instantiateClass(generatorClass));
 
+		// 设置代理模型，关于web的设置
 		ScopedProxyMode scopedProxyMode = componentScan.getEnum("scopedProxy");
 		if (scopedProxyMode != ScopedProxyMode.DEFAULT) {
 			scanner.setScopedProxyMode(scopedProxyMode);
@@ -91,24 +97,36 @@ class ComponentScanAnnotationParser {
 			scanner.setScopeMetadataResolver(BeanUtils.instantiateClass(resolverClass));
 		}
 
+		// 设置符合扫描条件的类文件，即定义哪些类文件可以被扫描到
+		// 通过阅读 @ComponentScan 注解源码，内容就是"**\/*.class"就是哪些后缀名的文件可被扫描进来
 		scanner.setResourcePattern(componentScan.getString("resourcePattern"));
 
+		// 设置指定包下的类可被扫描进来的过滤器，这个属性将扫描的范围进一步缩小
 		for (AnnotationAttributes filter : componentScan.getAnnotationArray("includeFilters")) {
 			for (TypeFilter typeFilter : typeFiltersFor(filter)) {
 				scanner.addIncludeFilter(typeFilter);
 			}
 		}
+		// 设置指定包下的类不能被扫描进来的过滤器
 		for (AnnotationAttributes filter : componentScan.getAnnotationArray("excludeFilters")) {
 			for (TypeFilter typeFilter : typeFiltersFor(filter)) {
 				scanner.addExcludeFilter(typeFilter);
 			}
 		}
 
+		// 设置包下扫描到的类是否需要懒加载,默认不需要
 		boolean lazyInit = componentScan.getBoolean("lazyInit");
 		if (lazyInit) {
 			scanner.getBeanDefinitionDefaults().setLazyInit(true);
 		}
 
+		/*
+		 * 这里是解析扫描包的路径
+		 * 注意：@ComponentScan 注解中value属性值为扫描的包，这个属性是一个数组，可以给一个数组扫描多个包
+		 * 还有一种方式为给一个字符串，通过分割符分割，以达到扫描多个包的目的，分割符Spring中默认的有逗号、分号和换行符
+		 * 还有一种方式是给一个数组，数组中每个字符串又指定了多个包，只不过是以分隔符分割的
+		 * 我们可以使用多种方式实现，Spring都能给你解析，放到basePackages集合中待处理
+		 */
 		Set<String> basePackages = new LinkedHashSet<>();
 		String[] basePackagesArray = componentScan.getStringArray("basePackages");
 		for (String pkg : basePackagesArray) {
@@ -116,6 +134,12 @@ class ComponentScanAnnotationParser {
 					ConfigurableApplicationContext.CONFIG_LOCATION_DELIMITERS);
 			Collections.addAll(basePackages, tokenized);
 		}
+		/*
+		 * 获取 @ComponentScan 注解的 basePackageClasses 属性，这个属性中放置的是类的Class，如果设置了这个属性
+		 * Spring会将这个类所在包加到扫描包路径的集合中
+		 * 也就是说，我们配置扫描包的路径时，可以给value属性设置路径，也可以在包路径下写一个类(只是一个空类，无逻辑)
+		 * 把这个类给 basePackageClasses 属性，Spring会解析这个类的包路径加到扫描集合中待扫描
+		 */
 		for (Class<?> clazz : componentScan.getClassArray("basePackageClasses")) {
 			basePackages.add(ClassUtils.getPackageName(clazz));
 		}
