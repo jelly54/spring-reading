@@ -143,16 +143,20 @@ class ComponentScanAnnotationParser {
 		for (Class<?> clazz : componentScan.getClassArray("basePackageClasses")) {
 			basePackages.add(ClassUtils.getPackageName(clazz));
 		}
+		// 通过以上步骤后，需要进行待扫描包的集合中却没有需要扫描的包，此时，Spring会认为 @ComponentScan 注解中没有关于
+		// 需要扫描包的配置，那么Spring会将加了 @ComponentScan 注解类的所在包路径加到集合中待扫描
 		if (basePackages.isEmpty()) {
 			basePackages.add(ClassUtils.getPackageName(declaringClass));
 		}
 
+		// 无论扫描包的路径是什么，需要将配置了这个扫描包的类排除，因为这个类不需要再次被扫描进来
 		scanner.addExcludeFilter(new AbstractTypeHierarchyTraversingFilter(false, false) {
 			@Override
 			protected boolean matchClassName(String className) {
 				return declaringClass.equals(className);
 			}
 		});
+		// 调用扫描器的方法进行扫描
 		return scanner.doScan(StringUtils.toStringArray(basePackages));
 	}
 

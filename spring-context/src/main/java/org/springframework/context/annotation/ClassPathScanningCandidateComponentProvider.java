@@ -192,6 +192,8 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	}
 
 	/**
+	 * 配置默认的扫描规则
+	 *
 	 * Register the default filter for {@link Component @Component}.
 	 * <p>This will implicitly register all annotations that have the
 	 * {@link Component @Component} meta-annotation including the
@@ -203,8 +205,16 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 */
 	@SuppressWarnings("unchecked")
 	protected void registerDefaultFilters() {
+		/*
+		 * 添加一个包含过滤器，这里使用的是 @Component 注解，即扫描出来的类需要有此注解可加载到容器中
+		 * 注意，@Controller、@Service、@Repository、@Configuration都含有此注解
+		 */
 		this.includeFilters.add(new AnnotationTypeFilter(Component.class));
 		ClassLoader cl = ClassPathScanningCandidateComponentProvider.class.getClassLoader();
+		/*
+		 * 如果存在JSR-250或者JSR-330相关的包，则加入他们相关的包含过滤器
+		 * 注解为 @ManagedBean、@Named
+		 */
 		try {
 			this.includeFilters.add(new AnnotationTypeFilter(
 					((Class<? extends Annotation>) ClassUtils.forName("javax.annotation.ManagedBean", cl)), false));
@@ -303,6 +313,8 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 
 
 	/**
+	 * 将包路径下的类扫描成 BeanDefinition
+	 *
 	 * Scan the class path for candidate components.
 	 * @param basePackage the package to check for annotated classes
 	 * @return a corresponding Set of autodetected bean definitions
@@ -412,24 +424,40 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 		return candidates;
 	}
 
+	/**
+	 * 执行包的扫描操作
+	 */
 	private Set<BeanDefinition> scanCandidateComponents(String basePackage) {
+		// 定义集合，用来存放扫描到并可以放到容器中的类
 		Set<BeanDefinition> candidates = new LinkedHashSet<>();
 		try {
+			// 定义扫描的全路径，即相对于系统的全路径(如果是Windows系统的话就包括盘符)
 			String packageSearchPath = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX +
 					resolveBasePackage(basePackage) + '/' + this.resourcePattern;
+			// 执行扫描操作，转换成一个个 Resource 对象，这个数组中是包含路径下所有的class文件的
+			// 注意：这里Spring使用的是ASM技术，此技术相当牛逼
 			Resource[] resources = getResourcePatternResolver().getResources(packageSearchPath);
+
+			// 获取日志的打印级别
 			boolean traceEnabled = logger.isTraceEnabled();
 			boolean debugEnabled = logger.isDebugEnabled();
+			// 遍历扫描出来的类
 			for (Resource resource : resources) {
 				if (traceEnabled) {
 					logger.trace("Scanning " + resource);
 				}
+				// 如果文件是可读的，就处理
 				if (resource.isReadable()) {
 					try {
+						// 获得类的元数据读取器
 						MetadataReader metadataReader = getMetadataReaderFactory().getMetadataReader(resource);
+						// 判断元信息是否符合加载条件
 						if (isCandidateComponent(metadataReader)) {
+							// 通过构造函数构建一个 BeanDefinition
 							ScannedGenericBeanDefinition sbd = new ScannedGenericBeanDefinition(metadataReader);
 							sbd.setSource(resource);
+							// 判断 BeanDefinition 是否符合Spring实例化的规则，即是否是可实例化的类
+							// 符合的话就加入到客家仔队列中
 							if (isCandidateComponent(sbd)) {
 								if (debugEnabled) {
 									logger.debug("Identified candidate component class: " + resource);
@@ -480,17 +508,29 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	}
 
 	/**
+	 * 断是否符合添加的条件，就是执行 @ComponentScan 注解中配置的 excludeFilters 排除条件和 includeFilters 加入条件
+	 *
 	 * Determine whether the given class does not match any exclude filter
 	 * and does match at least one include filter.
 	 * @param metadataReader the ASM ClassReader for the class
 	 * @return whether the class qualifies as a candidate component
 	 */
 	protected boolean isCandidateComponent(MetadataReader metadataReader) throws IOException {
+		/*
+		 * 如果程序员没有添加的话，此处会有一个 excludeFilter，是在执行 ComponentScanAnnotationParser#parse() 中添加的
+		 * 主要是过滤排除 @ComponentScan 注解类的重复加载
+		 */
 		for (TypeFilter tf : this.excludeFilters) {
 			if (tf.match(metadataReader, getMetadataReaderFactory())) {
 				return false;
 			}
 		}
+		/*
+		 * 如果程序员没有添加并且 @ComponentScan 注解中 useDefaultFilters 属性为默认true的话
+		 * 会包含一个Spring默认的加载过滤器，此时此处会有一个 includeFilter，
+		 * 是在执行 ComponentScanAnnotationParser#parse() 的83行
+		 * 创建 ClassPathBeanDefinitionScanner 扫描器实例时经过调用链生成的，具体请看这个类的构造方法
+		 */
 		for (TypeFilter tf : this.includeFilters) {
 			if (tf.match(metadataReader, getMetadataReaderFactory())) {
 				return isConditionMatch(metadataReader);

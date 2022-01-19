@@ -142,6 +142,8 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 	}
 
 	/**
+	 * 构建了一个路径扫描成 BeanDefinition 的类
+	 *
 	 * Create a new {@code ClassPathBeanDefinitionScanner} for the given bean factory and
 	 * using the given {@link Environment} when evaluating bean definition profile metadata.
 	 * @param registry the {@code BeanFactory} to load bean definitions into, in the form
@@ -162,6 +164,7 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 		Assert.notNull(registry, "BeanDefinitionRegistry must not be null");
 		this.registry = registry;
 
+		// 是否使用默认的过滤规则，@ComponentScan 中是默认使用的
 		if (useDefaultFilters) {
 			registerDefaultFilters();
 		}
@@ -261,6 +264,8 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 	}
 
 	/**
+	 * 正式执行扫描包，注意的是，扫描出来的 BeanDefinition 已经在此方法中完成了注册到环境中
+	 *
 	 * Perform a scan within the specified base packages,
 	 * returning the registered bean definitions.
 	 * <p>This method does <i>not</i> register an annotation config processor
@@ -270,24 +275,42 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 	 */
 	protected Set<BeanDefinitionHolder> doScan(String... basePackages) {
 		Assert.notEmpty(basePackages, "At least one base package must be specified");
+		// 装载BeanDefinitionHolder集合
 		Set<BeanDefinitionHolder> beanDefinitions = new LinkedHashSet<>();
+		// 循环包的路径依次扫描包
 		for (String basePackage : basePackages) {
+			// 扫描包下的类转换成 BeanDefinition
 			Set<BeanDefinition> candidates = findCandidateComponents(basePackage);
+			// 遍历扫描出来的 BeanDefinition
 			for (BeanDefinition candidate : candidates) {
+				// 设置动态代理模式
 				ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(candidate);
 				candidate.setScope(scopeMetadata.getScopeName());
+				// 根据Name生成器生成类名，一般是首字母小写
 				String beanName = this.beanNameGenerator.generateBeanName(candidate, this.registry);
+				// 如果 BeanDefinition 是 AbstractBeanDefinition 类型，则将 @ComponentScan 中设置的配置给到 BeanDefinition 中
+				// 这些配置是在 ComponentScanAnnotationParser#parse() 中初始化类扫描器后设置到扫描器中的全局变量中的
+				// 注意：这里是一定会进的，因为扫描出来的 BeanDefinition 是 ScannedGenericBeanDefinition 类型
 				if (candidate instanceof AbstractBeanDefinition) {
 					postProcessBeanDefinition((AbstractBeanDefinition) candidate, beanName);
 				}
+				// 如果 BeanDefinition 是 AnnotatedBeanDefinition 类型，则根据类上的注解设置信息
+				// 注意：这里的if和上面的if并不是排它关系，Spring会先设置全局值，如果类上再有注解
+				// 		则注解的配置会覆盖扫描器全局配置，则对于类的 BeanDefinition 来说，
+				// 		上面保证了扫描到的类的全局配置，这里保证了扫描到的类的个性化配置
 				if (candidate instanceof AnnotatedBeanDefinition) {
 					AnnotationConfigUtils.processCommonDefinitionAnnotations((AnnotatedBeanDefinition) candidate);
 				}
+				// 判断 BeanDefinition 是否有加载冲突
 				if (checkCandidate(beanName, candidate)) {
+					// 构建一个 BeanDefinitionHolder 封装类封装信息
 					BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(candidate, beanName);
+					// 获取此 BeanDefinition 的需要动态代理模型的 Holder， 放到最终的集合中
+					// 如果此 BeanDefinition 不需要动态代理模型，则放入的是此 BeanDefinition 的Holder
 					definitionHolder =
 							AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
 					beanDefinitions.add(definitionHolder);
+					// 向 DefaultListableBeanFactory 工厂中注册 BeanDefinition
 					registerBeanDefinition(definitionHolder, this.registry);
 				}
 			}
