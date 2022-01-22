@@ -457,7 +457,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 							ScannedGenericBeanDefinition sbd = new ScannedGenericBeanDefinition(metadataReader);
 							sbd.setSource(resource);
 							// 判断 BeanDefinition 是否符合Spring实例化的规则，即是否是可实例化的类
-							// 符合的话就加入到客家仔队列中
+							// 符合的话就加入到可加载队列中
 							if (isCandidateComponent(sbd)) {
 								if (debugEnabled) {
 									logger.debug("Identified candidate component class: " + resource);

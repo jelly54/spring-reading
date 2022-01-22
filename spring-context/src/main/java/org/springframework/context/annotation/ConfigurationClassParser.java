@@ -698,9 +698,13 @@ class ConfigurationClassParser {
 		return group;
 	}
 
+	/**
+	 * 处理 @Import 注解
+	 */
 	private void processImports(ConfigurationClass configClass, SourceClass currentSourceClass,
 			Collection<SourceClass> importCandidates, boolean checkForCircularImports) {
 
+		// 如果没有需要处理的 @Import 注解则不解析
 		if (importCandidates.isEmpty()) {
 			return;
 		}
@@ -709,25 +713,54 @@ class ConfigurationClassParser {
 			this.problemReporter.error(new CircularImportProblem(configClass, this.importStack));
 		}
 		else {
+			// 将需要处理的类压入到处理栈中
 			this.importStack.push(configClass);
+			/*
+			 * 遍历处理
+			 * 注意：@Import 注解可以传入三种类型的类
+			 * 		1、实现了 ImportSelector 接口的类class
+			 * 		2、实现了 ImportBeanDefinitionRegistrar 接口的类class
+			 * 		3、未实现以上两种接口的类class
+			 */
 			try {
 				for (SourceClass candidate : importCandidates) {
+					// 处理实现了 ImportSelector 接口的类
 					if (candidate.isAssignable(ImportSelector.class)) {
 						// Candidate class is an ImportSelector -> delegate to it to determine imports
+						// 获取类的Class并通过反射创建实例
 						Class<?> candidateClass = candidate.loadClass();
 						ImportSelector selector = BeanUtils.instantiateClass(candidateClass, ImportSelector.class);
+						// 如果实例实现了一些Spring的接口，则利用接口方法为其注入依赖
 						ParserStrategyUtils.invokeAwareMethods(
 								selector, this.environment, this.resourceLoader, this.registry);
+						// 如果实例实现了 DeferredImportSelector 接口，实例并不会立即进行解析，放入懒加载集合中稍后处理
 						if (this.deferredImportSelectors != null && selector instanceof DeferredImportSelector) {
 							this.deferredImportSelectors.add(
 									new DeferredImportSelectorHolder(configClass, (DeferredImportSelector) selector));
 						}
+						/*
+						 * 相反则会立即解析执行 ImportSelector 接口的 selectImports 方法
+						 * 该方法会返回需要加载到容器中的类全限定名，数组类型，可加载多个
+						 * 通过这些类名加载类并转化为 SourceClass
+						 * 注意：这里这个实现了 ImportSelector 接口的实例并不会加载到容器中
+						 * 注意：Spring高明的是，这里使用了递归处理，即这些类会被当做 @Import 注解中类的处理逻辑
+						 * 		进行处理，这样的好处是，我返回的全限定名的类也可以实现 ImportSelector 接口和
+						 * 		ImportBeanDefinitionRegistrar 接口从而发挥相应的作用，但是，如果只是一个普通的类，则
+						 * 		可以利用@Import处理普通类的处理逻辑进行处理，避免代码冗余
+						 */
 						else {
 							String[] importClassNames = selector.selectImports(currentSourceClass.getMetadata());
 							Collection<SourceClass> importSourceClasses = asSourceClasses(importClassNames);
 							processImports(configClass, currentSourceClass, importSourceClasses, false);
 						}
 					}
+					/*
+					 * 处理实现了 ImportSelector 接口的类
+					 * 这里的逻辑比较简单，如果实例实现了 ImportBeanDefinitionRegistrar 接口
+					 * 首先像上面一样，通过反射创建实例，为其注入一些Aware接口的依赖
+					 * 然后不同的是，这里并没有处理这个实例，而是放入了@Import注解所在的配置类构成的
+					 * SourceClass 实例中关于实现 ImportBeanDefinitionRegistrar 实例的一个Map集合中
+					 */
 					else if (candidate.isAssignable(ImportBeanDefinitionRegistrar.class)) {
 						// Candidate class is an ImportBeanDefinitionRegistrar ->
 						// delegate to it to register additional bean definitions
@@ -738,6 +771,11 @@ class ConfigurationClassParser {
 								registrar, this.environment, this.resourceLoader, this.registry);
 						configClass.addImportBeanDefinitionRegistrar(registrar, currentSourceClass.getMetadata());
 					}
+					/*
+					 * 第三种类型，未实现以上两种接口的类
+					 * 将其压入普通类处理栈中，然后这个类按照处理配置类的逻辑进行处理
+					 * 具体请看 processConfigurationClass 方法。其最终会放入一个集合中，并不会注册进容器中
+					 */
 					else {
 						// Candidate class not an ImportSelector or ImportBeanDefinitionRegistrar ->
 						// process it as an @Configuration class
