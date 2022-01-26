@@ -448,35 +448,55 @@ class ConfigurationClassParser {
 	}
 
 	/**
+	 * 获取接口上含有 @Bean 注解的方法
+	 *
 	 * Register default methods on interfaces implemented by the configuration class.
 	 */
 	private void processInterfaces(ConfigurationClass configClass, SourceClass sourceClass) throws IOException {
+		// 获取父级接口，遍历
 		for (SourceClass ifc : sourceClass.getInterfaces()) {
+			// 获取接口中含有 @Bean 注解的方法元信息，然后遍历
 			Set<MethodMetadata> beanMethods = retrieveBeanMethodMetadata(ifc);
 			for (MethodMetadata methodMetadata : beanMethods) {
+				// 只要此方法不是抽象类型的，则可以放入集合中待后续处理
 				if (!methodMetadata.isAbstract()) {
 					// A default method or other concrete method on a Java 8+ interface...
 					configClass.addBeanMethod(new BeanMethod(methodMetadata, configClass));
 				}
 			}
+			// 这里使用了递归，用来处理父级接口的父接口
 			processInterfaces(configClass, ifc);
 		}
 	}
 
 	/**
+	 * 解析类中含有 @Bean 注解的方法
 	 * Retrieve the metadata for all <code>@Bean</code> methods.
 	 */
 	private Set<MethodMetadata> retrieveBeanMethodMetadata(SourceClass sourceClass) {
+		// 获取含有 @Bean 注解的方法的元信息
 		AnnotationMetadata original = sourceClass.getMetadata();
 		Set<MethodMetadata> beanMethods = original.getAnnotatedMethods(Bean.class.getName());
+		/*
+		 * 如果含有 @Bean 注解的方法超过两个，并且是标准注解信息，则Spring会使用ASM技术
+		 * Spring 使用了JAVA的反射机制获取的Class，但是反射不能保证方法的声明顺序，也就是它所返回的方法顺序
+		 * 并不一定是代码从上到下编写的顺序，有可能类中的最下面的一个方法在 beanMethods 集合中是第一个
+		 * Spring 为保证方法的声明顺序，使用ASM技术读取作比较
+		 * 注意：这里只有ASM获取的方法比反射获取的方法多或者相等才会比较
+		 */
 		if (beanMethods.size() > 1 && original instanceof StandardAnnotationMetadata) {
 			// Try reading the class file via ASM for deterministic declaration order...
 			// Unfortunately, the JVM's standard reflection returns methods in arbitrary
 			// order, even between different runs of the same application on the same JVM.
 			try {
+				// 利用ASM技术返回类的元信息，并获取含有 @Bean 注解的方法元信息
 				AnnotationMetadata asm =
 						this.metadataReaderFactory.getMetadataReader(original.getClassName()).getAnnotationMetadata();
 				Set<MethodMetadata> asmMethods = asm.getAnnotatedMethods(Bean.class.getName());
+				/*
+				 * 这里重新创建了一个 LinkedHashSet 集合保证放入的顺序，遍历ASM方法名与java反射方法名一致
+				 * 则可以放入集合中并赋值给局部变量用于返回
+				 */
 				if (asmMethods.size() >= beanMethods.size()) {
 					Set<MethodMetadata> selectedMethods = new LinkedHashSet<>(asmMethods.size());
 					for (MethodMetadata asmMethod : asmMethods) {
