@@ -240,24 +240,31 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	}
 
 	/**
+	 * 使用CGLIB代理增强 @Configuration 配置类
+	 *
 	 * Prepare the Configuration classes for servicing bean requests at runtime
 	 * by replacing them with CGLIB-enhanced subclasses.
 	 */
 	@Override
 	public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+		// 根据 beanFactory,生成 factoryId 并做去重判断，避免重复解析
 		int factoryId = System.identityHashCode(beanFactory);
 		if (this.factoriesPostProcessed.contains(factoryId)) {
 			throw new IllegalStateException(
 					"postProcessBeanFactory already called on this post-processor against " + beanFactory);
 		}
 		this.factoriesPostProcessed.add(factoryId);
+		// 如果生成的ID并没有在 registriesPostProcessed 集合中，证明 BeanFactory 不受 BeanDefinitionRegistryPostProcessor
+		// 接口的支持，所以需要解析BeanFactory中的配置类
 		if (!this.registriesPostProcessed.contains(factoryId)) {
 			// BeanDefinitionRegistryPostProcessor hook apparently not supported...
 			// Simply call processConfigurationClasses lazily at this point then.
 			processConfigBeanDefinitions((BeanDefinitionRegistry) beanFactory);
 		}
 
+		// 对配置类加上 CGLIB 代理
 		enhanceConfigurationClasses(beanFactory);
+		// 注册 ImportAware 后置处理器
 		beanFactory.addBeanPostProcessor(new ImportAwareBeanPostProcessor(beanFactory));
 	}
 
@@ -417,16 +424,25 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	}
 
 	/**
+	 * 解析配置类，如果需要对Bean进行代理则进行代理
+	 *
 	 * Post-processes a BeanFactory in search of Configuration class BeanDefinitions;
 	 * any candidates are then enhanced by a {@link ConfigurationClassEnhancer}.
 	 * Candidate status is determined by BeanDefinition attribute metadata.
 	 * @see ConfigurationClassEnhancer
 	 */
 	public void enhanceConfigurationClasses(ConfigurableListableBeanFactory beanFactory) {
+		// 定义一个集合，存放需要被代理的Bean
 		Map<String, AbstractBeanDefinition> configBeanDefs = new LinkedHashMap<>();
+		// 获取容器中的BeanName，进行遍历
 		for (String beanName : beanFactory.getBeanDefinitionNames()) {
+			// 根据BeanName获得对应的 BeanDefinition
 			BeanDefinition beanDef = beanFactory.getBeanDefinition(beanName);
+			// 判断BeanDefinition 是否是一个全配置类
+			// 		存在 @Configuration 注解就是全配置类
+			// 		存在 @ComponentScan、@Import 等等就不是全配置类(半配置类)
 			if (ConfigurationClassUtils.isFullConfigurationClass(beanDef)) {
+				// 如果 BeanDefinition 不是 AbstractBeanDefinition 的子类，则不能给其进行代理
 				if (!(beanDef instanceof AbstractBeanDefinition)) {
 					throw new BeanDefinitionStoreException("Cannot enhance @Configuration bean definition '" +
 							beanName + "' since it is not stored in an AbstractBeanDefinition subclass");
@@ -437,29 +453,40 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 							"is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor " +
 							"return type: Consider declaring such methods as 'static'.");
 				}
+				// 放入集合中准备代理
 				configBeanDefs.put(beanName, (AbstractBeanDefinition) beanDef);
 			}
 		}
+		// 如果集合为空则没有需要代理的类
 		if (configBeanDefs.isEmpty()) {
 			// nothing to enhance -> return immediately
 			return;
 		}
 
+		// 创建进行CGLIB代理的对象
 		ConfigurationClassEnhancer enhancer = new ConfigurationClassEnhancer();
+		// 遍历需要代理的对象
 		for (Map.Entry<String, AbstractBeanDefinition> entry : configBeanDefs.entrySet()) {
+			// 获取 BeanDefinition
 			AbstractBeanDefinition beanDef = entry.getValue();
 			// If a @Configuration class gets proxied, always proxy the target class
+			// 给 BeanDefinition 设置标识，证明此 BeanDefinition 会永久被代理
 			beanDef.setAttribute(AutoProxyUtils.PRESERVE_TARGET_CLASS_ATTRIBUTE, Boolean.TRUE);
 			try {
 				// Set enhanced subclass of the user-specified bean class
+				// 获得需要代理的 BeanDefinition 代表的类的Class
 				Class<?> configClass = beanDef.resolveBeanClass(this.beanClassLoader);
+				// 目标Class真实存在的话就为其生成代理Class
 				if (configClass != null) {
+					// 生成代理Class
 					Class<?> enhancedClass = enhancer.enhance(configClass, this.beanClassLoader);
+					// 如果目标Class和代理Class不一样的话，就证明生成成功，进行替换
 					if (configClass != enhancedClass) {
 						if (logger.isDebugEnabled()) {
 							logger.debug(String.format("Replacing bean definition '%s' existing class '%s' with " +
 									"enhanced class '%s'", entry.getKey(), configClass.getName(), enhancedClass.getName()));
 						}
+						// 将 BeanDefinition 中的 BeanClass 替换成代理Class，完成代理
 						beanDef.setBeanClass(enhancedClass);
 					}
 				}

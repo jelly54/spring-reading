@@ -33,6 +33,9 @@ class BeanAnnotationHelper {
 		return AnnotatedElementUtils.hasAnnotation(method, Bean.class);
 	}
 
+	/**
+	 * 获得@Bean方法返回对象的BeanName，默认使用方法名，如果在@Bean注解中指定，则使用注解中的若指定多个，则使用第一个
+	 */
 	public static String determineBeanNameFor(Method beanMethod) {
 		// By default, the bean name is the name of the @Bean-annotated method
 		String beanName = beanMethod.getName();
